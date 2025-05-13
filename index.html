@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本部巡回バス情報</title>
+    <style>
+        /* スタイル部分は変更なし */
+        :root {
+            --bg-color: #121212;
+            --text-color: #3498db;
+            --primary-color: #2ecc71;
+            --secondary-color: #3498db;
+            --card-bg: #1e1e1e;
+            --button-bg: #2980b9;
+        }
+
+        .clear-mode {
+            --bg-color: #f5f5f5;
+            --text-color: #2980b9;
+            --primary-color: #27ae60;
+            --secondary-color: #2980b9;
+            --card-bg: #ffffff;
+            --button-bg: #3498db;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            color: var(--text-color);
+            margin-bottom: 30px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        button, select {
+            background-color: var(--button-bg);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .map-container {
+            position: relative;
+            width: 600px;
+            height: 600px;
+            margin: 0 auto;
+        }
+
+        .circular-map {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid var(--primary-color);
+        }
+
+        .bus-stop {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background-color: var(--secondary-color);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            transition: all 0.3s;
+            font-weight: bold;
+            color: white;
+            font-size: 10px;
+            text-align: center;
+            word-break: break-word;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+
+        .bus-stop:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+            box-shadow: 0 0 10px var(--secondary-color);
+        }
+
+        .route-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 80%;
+            height: 80%;
+            border: 2px solid var(--primary-color);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-color);
+        }
+
+        footer {
+            margin-top: 50px;
+            padding: 20px;
+            text-align: center;
+            color: var(--text-color);
+        }
+
+        .contact-link {
+            color: var(--text-color);
+            text-decoration: none;
+        }
+
+        .contact-link:hover {
+            text-decoration: underline;
+        }
+
+        .center-stop-name {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text-color);
+            text-align: center;
+            width: 80%;
+            z-index: 5;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .center-stop-name.visible {
+            opacity: 1;
+        }
+
+        @media (max-width: 700px) {
+            .map-container {
+                width: 300px;
+                height: 300px;
+            }
+            
+            .bus-stop {
+                width: 40px;
+                height: 40px;
+                font-size: 8px;
+            }
+
+            .center-stop-name {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body class="dark-mode">
+    <div class="container">
+        <h1 id="app-title"><span id="subtitle">本部巡回バス情報</span></h1>
+        
+        <div class="controls">
+            <button id="theme-toggle">dark</button>
+            <button id="language-toggle">English</button>
+            <select id="day-select">
+                <option value="weekday">平日</option>
+                <option value="saturday">土曜日</option>
+                <option value="sunday">日曜・祝日</option>
+            </select>
+        </div>
+        
+        <div class="map-container">
+            <div class="circular-map">
+                <div class="route-line"></div>
+                <div class="center-stop-name"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="stop-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 id="modal-title">バス停情報</h2>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+    
+    <footer>
+        <a href="mailto:mementomorikatsu@gmail.com" class="contact-link">お問い合わせ<br>mementomorikatsu@gmail.com</a>
+    </footer>
+
+    <script>
+        // 言語データ
+        const translations = {
+            en: {
+                title: "Motobu Circular Bus",
+                subtitle: "Motobu Circular Bus Information",
+                themeToggle: "light",
+                languageToggle: "日本語",
+                weekday: "Weekday",
+                saturday: "Saturday",
+                sunday: "Sunday/Holiday",
+                modalTitle: "Bus Stop Information",
+                route65: "Route 65 (Clockwise)",
+                route66: "Route 66 (Counter-clockwise)",
+                nextStop: "Next stop:",
+                travelTime: "Travel time:",
+                minutes: "minutes",
+                fromNago: "From Nago Terminal",
+                contact: "Contact<br>mementomorikatsu@gmail.com"
+            },
+            ja: {
+                title: "本部巡回バス",
+                subtitle: "本部巡回バス情報",
+                themeToggle: "dark",
+                languageToggle: "English",
+                weekday: "平日",
+                saturday: "土曜日",
+                sunday: "日曜・祝日",
+                modalTitle: "バス停情報",
+                route65: "65系統 (時計回り)",
+                route66: "66系統 (反時計回り)",
+                nextStop: "次のバス停:",
+                travelTime: "所要時間:",
+                minutes: "分",
+                fromNago: "名護バスターミナルから",
+                contact: "お問い合わせ<br>mementomorikatsu@gmail.com"
+            }
+        };
+
+        // バス停データ（配置を反転）
+        const busStops = [
+            { 
+                id: "nago-terminal",
+                name: { en: "Nago Terminal", ja: "名護バスターミナル" },
+                angle: 90, // 0時/真上 (数学的な角度では90度) - 名護バスターミナルは同じ位置に保持
+                description: { 
+                    en: "Main bus terminal in Nago city, starting point for both routes.",
+                    ja: "名護市の主要バスターミナル、両路線の起点です。"
+                }
+            },
+            { 
+                id: "churaumi-beach",
+                name: { en: "Churaumi Beach", ja: "美ら海オン・ザ・ビーチ" },
+                angle: 120, // 11時位置 (反時計回り)
+                description: { 
+                    en: "Beautiful beach area near the famous aquarium.",
+                    ja: "美ら海水族館近くの美しいビーチエリアです。"
+                }
+            },
+            { 
+                id: "motobu-port",
+                name: { en: "Motobu Port", ja: "本部港" },
+                angle: 150, // 10時位置
+                description: { 
+                    en: "Port area with ferry access to nearby islands.",
+                    ja: "近隣の島々へのフェリーが発着する港です。"
+                }
+            },
+            { 
+                id: "sesoko-entrance",
+                name: { en: "Sesoko Entrance", ja: "瀬底島入口" },
+                angle: 180, // 9時位置 (左側)
+                description: { 
+                    en: "Access point to Sesoko Island via bridge.",
+                    ja: "瀬底大橋を渡って瀬底島へアクセスできる地点です。"
+                }
+            },
+            { 
+                id: "tokuchi",
+                name: { en: "Tokuchi", ja: "渡久地" },
+                angle: 210, // 8時位置
+                description: { 
+                    en: "Local residential area in Motobu town.",
+                    ja: "本部町の住宅地域です。"
+                }
+            },
+            { 
+                id: "churaumi-aquarium",
+                name: { en: "Churaumi Aquarium", ja: "美ら海水族館" },
+                angle: 240, // 7時位置
+                description: { 
+                    en: "One of Japan's most famous aquariums.",
+                    ja: "日本で最も有名な水族館の一つです。"
+                }
+            },
+            { 
+                id: "bise",
+                name: { en: "Bise", ja: "備瀬" },
+                angle: 270, // 6時位置 (真下)
+                description: { 
+                    en: "Traditional Okinawan village with Fukugi tree lanes.",
+                    ja: "フクギ並木が美しい沖縄の伝統的な集落です。"
+                }
+            },
+            { 
+                id: "nakijin-castle",
+                name: { en: "Nakijin Castle", ja: "今帰仁城" },
+                angle: 300, // 5時位置
+                description: { 
+                    en: "Access point to Nakijin Castle ruins, a UNESCO site.",
+                    ja: "世界遺産の今帰仁城跡へのアクセス地点です。"
+                }
+            },
+            { 
+                id: "shoshi",
+                name: { en: "Shoshi", ja: "諸志" },
+                angle: 330, // 4時位置
+                description: { 
+                    en: "Small village area in Nakijin district.",
+                    ja: "今帰仁村の集落地域です。"
+                }
+            },
+            { 
+                id: "nakijin-office",
+                name: { en: "Nakijin Office", ja: "今帰仁村役場" },
+                angle: 0, // 3時位置 (右側)
+                description: { 
+                    en: "Administrative center of Nakijin village.",
+                    ja: "今帰仁村の行政の中心です。"
+                }
+            },
+            { 
+                id: "warumi-bridge",
+                name: { en: "Warumi Bridge", ja: "ワルミ橋入口" },
+                angle: 30, // 2時位置
+                description: { 
+                    en: "Scenic bridge area with ocean views.",
+                    ja: "美しい海の景色が見える橋のエリアです。"
+                }
+            },
+            { 
+                id: "nago-center",
+                name: { en: "Nago Center", ja: "名護中心" },
+                angle: 60, // 1時位置
+                description: { 
+                    en: "Central area of Nago city.",
+                    ja: "名護市の中心部エリアです。"
+                }
+            }
+        ];
+
+        // 移動時間データ
+        const travelTimes = {
+            weekday: {
+                "65": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120], // 時計回り
+                "66": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]  // 反時計回り
+            },
+            saturday: {
+                "65": [0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144],
+                "66": [0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144]
+            },
+            sunday: {
+                "65": [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180],
+                "66": [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180]
+            }
+        };
+
+        // アプリの状態
+        let currentLanguage = "ja";
+        let currentTheme = "dark";
+        let currentDay = "weekday";
+
+        // DOM要素
+        const appTitle = document.getElementById("app-title");
+        const subtitle = document.getElementById("subtitle");
+        const themeToggle = document.getElementById("theme-toggle");
+        const languageToggle = document.getElementById("language-toggle");
+        const daySelect = document.getElementById("day-select");
+        const modal = document.getElementById("stop-modal");
+        const modalTitle = document.getElementById("modal-title");
+        const modalContent = document.getElementById("modal-content");
+        const closeBtn = document.querySelector(".close-btn");
+        const contactLink = document.querySelector(".contact-link");
+        const circularMap = document.querySelector(".circular-map");
+        const centerStopName = document.querySelector(".center-stop-name");
+
+        // アプリの初期化
+        function initApp() {
+            createBusStops();
+            setupEventListeners();
+            updateUI();
+        }
+
+        // バス停を作成
+        function createBusStops() {
+            busStops.forEach((stop, index) => {
+                const stopElement = document.createElement("div");
+                stopElement.className = "bus-stop";
+                stopElement.id = stop.id;
+                stopElement.dataset.index = index;
+                
+                // 位置計算
+                const radius = 45;
+                const angleRad = (stop.angle * Math.PI) / 180;
+                const x = 50 + radius * Math.cos(angleRad);
+                const y = 50 + radius * Math.sin(angleRad);
+                
+                stopElement.style.left = `${x}%`;
+                stopElement.style.top = `${y}%`;
+                
+                // 短縮名表示
+                const shortName = currentLanguage === "en" 
+                    ? stop.name.en.split(" ")[0] 
+                    : stop.name.ja.replace(/\(.+\)|入口/g, "");
+                stopElement.textContent = shortName;
+                
+                circularMap.appendChild(stopElement);
+            });
+        }
+
+        // イベントリスナー設定
+        function setupEventListeners() {
+            // テーマ切り替え
+            themeToggle.addEventListener("click", toggleTheme);
+            
+            // 言語切り替え
+            languageToggle.addEventListener("click", toggleLanguage);
+            
+            // 日付選択
+            daySelect.addEventListener("change", (e) => {
+                currentDay = e.target.value;
+            });
+            
+            // バス停インタラクション
+            document.querySelectorAll(".bus-stop").forEach(stop => {
+                stop.addEventListener("mouseenter", showStopNameInCenter);
+                stop.addEventListener("mouseleave", hideStopNameInCenter);
+                stop.addEventListener("click", showStopInfo);
+            });
+            
+            // モーダル閉じる
+            closeBtn.addEventListener("click", closeModal);
+            window.addEventListener("click", (e) => {
+                if (e.target === modal) closeModal();
+            });
+        }
+
+        // テーマ切り替え
+        function toggleTheme() {
+            currentTheme = currentTheme === "dark" ? "clear" : "dark";
+            document.body.classList.toggle("clear-mode");
+            updateUI();
+        }
+
+        // 言語切り替え
+        function toggleLanguage() {
+            currentLanguage = currentLanguage === "en" ? "ja" : "en";
+            updateUI();
+            updateBusStopNames();
+        }
+
+        // バス停名を中央に表示
+        function showStopNameInCenter(e) {
+            const index = parseInt(e.currentTarget.dataset.index);
+            centerStopName.textContent = busStops[index].name[currentLanguage];
+            centerStopName.classList.add("visible");
+        }
+
+        // 中央のバス停名を非表示
+        function hideStopNameInCenter() {
+            centerStopName.classList.remove("visible");
+        }
+
+        // バス停情報表示
+        function showStopInfo(e) {
+            const index = parseInt(e.currentTarget.dataset.index);
+            const stop = busStops[index];
+            
+            // 時計回り(65系統)は次の停、反時計回り(66系統)は前の停
+            const nextIndex = (index + 1) % busStops.length;
+            const prevIndex = (index - 1 + busStops.length) % busStops.length;
+            
+            const time65 = travelTimes[currentDay]["65"][nextIndex] - travelTimes[currentDay]["65"][index];
+            const time66 = travelTimes[currentDay]["66"][index] - travelTimes[currentDay]["66"][prevIndex];
+            
+            modalTitle.textContent = `${stop.name[currentLanguage]} - ${translations[currentLanguage].modalTitle}`;
+            
+            modalContent.innerHTML = `
+                <p>${stop.description[currentLanguage]}</p>
+                <div style="margin-top: 20px;">
+                    <h3>${translations[currentLanguage].route65}</h3>
+                    <p>${translations[currentLanguage].nextStop}: ${busStops[nextIndex].name[currentLanguage]}</p>
+                    <p>${translations[currentLanguage].travelTime}: ${Math.abs(time65)} ${translations[currentLanguage].minutes}</p>
+                    <p><small>${translations[currentLanguage].fromNago}: ${travelTimes[currentDay]["65"][index]} ${translations[currentLanguage].minutes}</small></p>
+                </div>
+                <div style="margin-top: 20px;">
+                    <h3>${translations[currentLanguage].route66}</h3>
+                    <p>${translations[currentLanguage].nextStop}: ${busStops[prevIndex].name[currentLanguage]}</p>
+                    <p>${translations[currentLanguage].travelTime}: ${Math.abs(time66)} ${translations[currentLanguage].minutes}</p>
+                    <p><small>${translations[currentLanguage].fromNago}: ${travelTimes[currentDay]["66"][index]} ${translations[currentLanguage].minutes}</small></p>
+                </div>
+            `;
+            
+            modal.style.display = "flex";
+        }
+
+        // モーダルを閉じる
+        function closeModal() {
+            modal.style.display = "none";
+        }
+
+        // バス停名を更新
+        function updateBusStopNames() {
+            document.querySelectorAll(".bus-stop").forEach(stopEl => {
+                const index = parseInt(stopEl.dataset.index);
+                const stop = busStops[index];
+                const shortName = currentLanguage === "en" 
+                    ? stop.name.en.split(" ")[0] 
+                    : stop.name.ja.replace(/\(.+\)|入口/g, "");
+                stopEl.textContent = shortName;
+            });
+        }
+
+        // UIを更新
+        function updateUI() {
+            themeToggle.textContent = translations[currentLanguage].themeToggle;
+            languageToggle.textContent = translations[currentLanguage].languageToggle;
+            subtitle.textContent = translations[currentLanguage].subtitle;
+            
+            daySelect.innerHTML = `
+                <option value="weekday">${translations[currentLanguage].weekday}</option>
+                <option value="saturday">${translations[currentLanguage].saturday}</option>
+                <option value="sunday">${translations[currentLanguage].sunday}</option>
+            `;
+            daySelect.value = currentDay;
+            
+            contactLink.innerHTML = translations[currentLanguage].contact;
+        }
+
+        // アプリを起動
+        document.addEventListener("DOMContentLoaded", initApp);
+    </script>
+</body>
+</html>
