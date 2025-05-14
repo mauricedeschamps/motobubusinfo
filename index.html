@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本部巡回バス情報</title>
+    <title>本部巡回バス65・66系統情報</title>
     <style>
-        /* スタイル部分は変更なし */
         :root {
             --bg-color: #121212;
             --text-color: #3498db;
@@ -137,8 +136,10 @@
             background-color: var(--card-bg);
             padding: 20px;
             border-radius: 10px;
-            max-width: 400px;
+            max-width: 600px;
             width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
             position: relative;
         }
@@ -187,6 +188,49 @@
             opacity: 1;
         }
 
+        .timetable-btn {
+            margin: 10px 5px;
+            padding: 8px 15px;
+            background-color: var(--primary-color);
+        }
+
+        .timetable {
+            display: none;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: rgba(0,0,0,0.1);
+            border-radius: 5px;
+        }
+
+        .timetable.active {
+            display: block;
+        }
+
+        .timetable h4 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        .timetable-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .timetable-table th, .timetable-table td {
+            padding: 8px;
+            border: 1px solid var(--text-color);
+            text-align: center;
+        }
+
+        .stop-image {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
         @media (max-width: 700px) {
             .map-container {
                 width: 300px;
@@ -202,12 +246,16 @@
             .center-stop-name {
                 font-size: 16px;
             }
+            
+            .modal-content {
+                max-width: 90%;
+            }
         }
     </style>
 </head>
 <body class="dark-mode">
     <div class="container">
-        <h1 id="app-title"><span id="subtitle">本部巡回バス情報</span></h1>
+        <h1 id="app-title"><span id="subtitle">本部巡回バス65・66系統情報</span></h1>
         
         <div class="controls">
             <button id="theme-toggle">dark</button>
@@ -243,8 +291,8 @@
         // 言語データ
         const translations = {
             en: {
-                title: "Motobu Circular Bus",
-                subtitle: "Motobu Circular Bus Information",
+                title: "Motobu Circular Bus Route 65 & 66",
+                subtitle: "Motobu Circular Bus Route 65 & 66 Information",
                 themeToggle: "light",
                 languageToggle: "日本語",
                 weekday: "Weekday",
@@ -257,11 +305,18 @@
                 travelTime: "Travel time:",
                 minutes: "minutes",
                 fromNago: "From Nago Terminal",
-                contact: "Contact<br>mementomorikatsu@gmail.com"
+                contact: "Contact<br>mementomorikatsu@gmail.com",
+                showTimetable65: "Show Route 65 Timetable",
+                showTimetable66: "Show Route 66 Timetable",
+                timetable: "Timetable",
+                weekdayTimetable: "Weekday Timetable",
+                saturdayTimetable: "Saturday Timetable",
+                sundayTimetable: "Sunday/Holiday Timetable",
+                departureTimes: "Departure Times"
             },
             ja: {
-                title: "本部巡回バス",
-                subtitle: "本部巡回バス情報",
+                title: "本部巡回バス65・66系統",
+                subtitle: "本部巡回バス65・66系統情報",
                 themeToggle: "dark",
                 languageToggle: "English",
                 weekday: "平日",
@@ -274,127 +329,288 @@
                 travelTime: "所要時間:",
                 minutes: "分",
                 fromNago: "名護バスターミナルから",
-                contact: "お問い合わせ<br>mementomorikatsu@gmail.com"
+                contact: "お問い合わせ<br>mementomorikatsu@gmail.com",
+                showTimetable65: "65系統時刻表を表示",
+                showTimetable66: "66系統時刻表を表示",
+                timetable: "時刻表",
+                weekdayTimetable: "平日時刻表",
+                saturdayTimetable: "土曜日時刻表",
+                sundayTimetable: "日曜・祝日時刻表",
+                departureTimes: "発車時刻"
             }
         };
 
-        // バス停データ（配置を反転）
+        // バス停データ
         const busStops = [
             { 
                 id: "nago-terminal",
                 name: { en: "Nago Terminal", ja: "名護バスターミナル" },
-                angle: 90, // 0時/真上 (数学的な角度では90度) - 名護バスターミナルは同じ位置に保持
+                angle: 90,
                 description: { 
                     en: "Main bus terminal in Nago city, starting point for both routes.",
                     ja: "名護市の主要バスターミナル、両路線の起点です。"
+                },
+                image: "https://example.com/nago-terminal.jpg",
+                sightseeing: {
+                    en: "Nago Terminal is the transportation hub of northern Okinawa. Nearby attractions include Nago Pineapple Park and Neo Park Okinawa.",
+                    ja: "名護バスターミナルは沖縄北部の交通の要所です。近くには名護パイナップルパークやネオパークオキナワなどの観光スポットがあります。"
                 }
             },
             { 
                 id: "shio-gawa-beach",
                 name: { en: "Shio-gawa Beach", ja: "塩川(ビーチ)" },
-                angle: 120, // 11時位置 (反時計回り)
+                angle: 120,
                 description: { 
                     en: "Beautiful beach facing Nago Bay with white sand and clear water.",
                     ja: "名護湾に面した美しいビーチで、白い砂浜と透き通った海が特徴です。"
+                },
+                image: "https://example.com/shio-gawa-beach.jpg",
+                sightseeing: {
+                    en: "Shio-gawa Beach is known for its calm waters, perfect for swimming and snorkeling. The beach is less crowded than more famous spots in Okinawa.",
+                    ja: "塩川ビーチは波が穏やかで泳ぎやすく、シュノーケリングにも最適です。沖縄の有名ビーチに比べて人が少ないのも魅力です。"
                 }
             },
             { 
                 id: "motobu-port",
                 name: { en: "Motobu Port", ja: "本部港" },
-                angle: 150, // 10時位置
+                angle: 150,
                 description: { 
                     en: "Port area with ferry access to nearby islands.",
                     ja: "近隣の島々へのフェリーが発着する港です。"
+                },
+                image: "https://example.com/motobu-port.jpg",
+                sightseeing: {
+                    en: "Motobu Port offers ferry services to Ie Island and other nearby islands. The port area has fresh seafood markets and local restaurants.",
+                    ja: "本部港からは伊江島など近隣の島々へのフェリーが発着します。港周辺には海鮮市場や地元料理店が並んでいます。"
                 }
             },
             { 
                 id: "sesoko-entrance",
                 name: { en: "Sesoko Entrance", ja: "瀬底島入口" },
-                angle: 180, // 9時位置 (左側)
+                angle: 180,
                 description: { 
                     en: "Access point to Sesoko Island via bridge.",
                     ja: "瀬底大橋を渡って瀬底島へアクセスできる地点です。"
+                },
+                image: "https://example.com/sesoko-entrance.jpg",
+                sightseeing: {
+                    en: "Sesoko Island is connected by a beautiful bridge. The island has one of Okinawa's best beaches with coral reefs just offshore.",
+                    ja: "瀬底島は美しい橋で結ばれています。島には沖縄有数のビーチがあり、岸からすぐの所にサンゴ礁が広がっています。"
                 }
             },
             { 
                 id: "tokuchi",
                 name: { en: "Tokuchi", ja: "渡久地" },
-                angle: 210, // 8時位置
+                angle: 210,
                 description: { 
                     en: "Local residential area in Motobu town.",
                     ja: "本部町の住宅地域です。"
+                },
+                image: "https://example.com/tokuchi.jpg",
+                sightseeing: {
+                    en: "Tokuchi is a quiet residential area with traditional Okinawan houses. Nearby you can find small local shops and eateries.",
+                    ja: "渡久地は沖縄の伝統的な家屋が並ぶ静かな住宅地です。近くには地元の小さな商店や飲食店があります。"
                 }
             },
             { 
                 id: "churaumi-aquarium",
                 name: { en: "Churaumi Aquarium", ja: "美ら海水族館" },
-                angle: 240, // 7時位置
+                angle: 240,
                 description: { 
                     en: "One of Japan's most famous aquariums.",
                     ja: "日本で最も有名な水族館の一つです。"
+                },
+                image: "https://example.com/churaumi-aquarium.jpg",
+                sightseeing: {
+                    en: "Churaumi Aquarium is famous for its massive Kuroshio Tank housing whale sharks and manta rays. The Ocean Expo Park surrounding the aquarium offers beautiful gardens and ocean views.",
+                    ja: "美ら海水族館はジンベエザメやマンタが泳ぐ巨大な黒潮のタンクで有名です。周辺の海洋博公園には美しい庭園や海が見渡せるスポットがあります。"
                 }
             },
             { 
                 id: "bise",
                 name: { en: "Bise", ja: "備瀬" },
-                angle: 270, // 6時位置 (真下)
+                angle: 270,
                 description: { 
                     en: "Traditional Okinawan village with Fukugi tree lanes.",
                     ja: "フクギ並木が美しい沖縄の伝統的な集落です。"
+                },
+                image: "https://example.com/bise.jpg",
+                sightseeing: {
+                    en: "Bise is famous for its Fukugi tree lanes that provide cool shade. The village retains traditional Okinawan architecture and offers a glimpse into local life.",
+                    ja: "備瀬は涼しい木陰を作るフクギ並木で有名です。伝統的な沖縄の家屋が残り、地元の生活を垣間見ることができます。"
                 }
             },
             { 
                 id: "nakijin-castle",
                 name: { en: "Nakijin Castle", ja: "今帰仁城" },
-                angle: 300, // 5時位置
+                angle: 300,
                 description: { 
                     en: "Access point to Nakijin Castle ruins, a UNESCO site.",
                     ja: "世界遺産の今帰仁城跡へのアクセス地点です。"
+                },
+                image: "https://example.com/nakijin-castle.jpg",
+                sightseeing: {
+                    en: "Nakijin Castle ruins are a UNESCO World Heritage Site with stunning views of the East China Sea. The castle is especially beautiful during cherry blossom season in January-February.",
+                    ja: "今帰仁城跡はユネスコ世界遺産で、東シナ海の絶景が望めます。1月から2月にかけての桜の季節は特に美しいです。"
                 }
             },
             { 
                 id: "shoshi",
                 name: { en: "Shoshi", ja: "諸志" },
-                angle: 330, // 4時位置
+                angle: 330,
                 description: { 
                     en: "Small village area in Nakijin district.",
                     ja: "今帰仁村の集落地域です。"
+                },
+                image: "https://example.com/shoshi.jpg",
+                sightseeing: {
+                    en: "Shoshi is a peaceful agricultural area known for its sugarcane fields. Visitors can enjoy the slow pace of rural Okinawan life here.",
+                    ja: "諸志はサトウキビ畑が広がるのどかな農業地域です。沖縄の田舎のゆったりとした時間を楽しむことができます。"
                 }
             },
             { 
                 id: "nakijin-office",
                 name: { en: "Nakijin Office", ja: "今帰仁村役場" },
-                angle: 0, // 3時位置 (右側)
+                angle: 0,
                 description: { 
                     en: "Administrative center of Nakijin village.",
                     ja: "今帰仁村の行政の中心です。"
+                },
+                image: "https://example.com/nakijin-office.jpg",
+                sightseeing: {
+                    en: "The Nakijin Village Office is surrounded by local government buildings and services. The area has several restaurants serving Okinawan soba and other local dishes.",
+                    ja: "今帰仁村役場周辺には行政施設が集まっています。沖縄そばなどの地元料理を提供する飲食店もいくつかあります。"
                 }
             },
             { 
                 id: "warumi-bridge",
                 name: { en: "Warumi Bridge", ja: "ワルミ橋入口" },
-                angle: 30, // 2時位置
+                angle: 30,
                 description: { 
                     en: "Scenic bridge area with ocean views.",
                     ja: "美しい海の景色が見える橋のエリアです。"
+                },
+                image: "https://example.com/warumi-bridge.jpg",
+                sightseeing: {
+                    en: "Warumi Bridge offers panoramic views of the ocean and nearby islands. The area is popular for fishing and sunset viewing.",
+                    ja: "ワルミ橋からは海と近隣の島々のパノラマビューが楽しめます。釣りや夕日鑑賞のスポットとして人気です。"
                 }
             },
             { 
                 id: "nago-city-hall",
                 name: { en: "Nago City Hall", ja: "名護市役所前" },
-                angle: 60, // 1時位置
+                angle: 60,
                 description: { 
                     en: "Convenient access to Naha and the airport from this stop.",
                     ja: "那覇や空港へのアクセスが良いバス停です。"
+                },
+                image: "https://example.com/nago-city-hall.jpg",
+                sightseeing: {
+                    en: "Nago City Hall is located in the center of Nago city. Nearby attractions include Nago Central Park and the Nago Museum.",
+                    ja: "名護市役所は名護市の中心部に位置しています。近くには名護中央公園や名護博物館などの施設があります。"
                 }
             }
         ];
 
+        // 時刻表データ
+        const timetables = {
+            weekday: {
+                "65": {
+                    "nago-terminal": ["06:00", "07:30", "09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00"],
+                    "shio-gawa-beach": ["06:10", "07:40", "09:10", "10:40", "12:10", "13:40", "15:10", "16:40", "18:10"],
+                    "motobu-port": ["06:20", "07:50", "09:20", "10:50", "12:20", "13:50", "15:20", "16:50", "18:20"],
+                    "sesoko-entrance": ["06:30", "08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30"],
+                    "tokuchi": ["06:40", "08:10", "09:40", "11:10", "12:40", "14:10", "15:40", "17:10", "18:40"],
+                    "churaumi-aquarium": ["06:50", "08:20", "09:50", "11:20", "12:50", "14:20", "15:50", "17:20", "18:50"],
+                    "bise": ["07:00", "08:30", "10:00", "11:30", "13:00", "14:30", "16:00", "17:30", "19:00"],
+                    "nakijin-castle": ["07:10", "08:40", "10:10", "11:40", "13:10", "14:40", "16:10", "17:40", "19:10"],
+                    "shoshi": ["07:20", "08:50", "10:20", "11:50", "13:20", "14:50", "16:20", "17:50", "19:20"],
+                    "nakijin-office": ["07:30", "09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30"],
+                    "warumi-bridge": ["07:40", "09:10", "10:40", "12:10", "13:40", "15:10", "16:40", "18:10", "19:40"],
+                    "nago-city-hall": ["07:50", "09:20", "10:50", "12:20", "13:50", "15:20", "16:50", "18:20", "19:50"]
+                },
+                "66": {
+                    "nago-terminal": ["06:00", "07:30", "09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00"],
+                    "nago-city-hall": ["06:10", "07:40", "09:10", "10:40", "12:10", "13:40", "15:10", "16:40", "18:10"],
+                    "warumi-bridge": ["06:20", "07:50", "09:20", "10:50", "12:20", "13:50", "15:20", "16:50", "18:20"],
+                    "nakijin-office": ["06:30", "08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30"],
+                    "shoshi": ["06:40", "08:10", "09:40", "11:10", "12:40", "14:10", "15:40", "17:10", "18:40"],
+                    "nakijin-castle": ["06:50", "08:20", "09:50", "11:20", "12:50", "14:20", "15:50", "17:20", "18:50"],
+                    "bise": ["07:00", "08:30", "10:00", "11:30", "13:00", "14:30", "16:00", "17:30", "19:00"],
+                    "churaumi-aquarium": ["07:10", "08:40", "10:10", "11:40", "13:10", "14:40", "16:10", "17:40", "19:10"],
+                    "tokuchi": ["07:20", "08:50", "10:20", "11:50", "13:20", "14:50", "16:20", "17:50", "19:20"],
+                    "sesoko-entrance": ["07:30", "09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30"],
+                    "motobu-port": ["07:40", "09:10", "10:40", "12:10", "13:40", "15:10", "16:40", "18:10", "19:40"],
+                    "shio-gawa-beach": ["07:50", "09:20", "10:50", "12:20", "13:50", "15:20", "16:50", "18:20", "19:50"]
+                }
+            },
+            saturday: {
+                "65": {
+                    "nago-terminal": ["06:30", "08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00"],
+                    "shio-gawa-beach": ["06:40", "08:10", "09:40", "11:10", "12:40", "14:10", "15:40", "17:10"],
+                    "motobu-port": ["06:50", "08:20", "09:50", "11:20", "12:50", "14:20", "15:50", "17:20"],
+                    "sesoko-entrance": ["07:00", "08:30", "10:00", "11:30", "13:00", "14:30", "16:00", "17:30"],
+                    "tokuchi": ["07:10", "08:40", "10:10", "11:40", "13:10", "14:40", "16:10", "17:40"],
+                    "churaumi-aquarium": ["07:20", "08:50", "10:20", "11:50", "13:20", "14:50", "16:20", "17:50"],
+                    "bise": ["07:30", "09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00"],
+                    "nakijin-castle": ["07:40", "09:10", "10:40", "12:10", "13:40", "15:10", "16:40", "18:10"],
+                    "shoshi": ["07:50", "09:20", "10:50", "12:20", "13:50", "15:20", "16:50", "18:20"],
+                    "nakijin-office": ["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30"],
+                    "warumi-bridge": ["08:10", "09:40", "11:10", "12:40", "14:10", "15:40", "17:10", "18:40"],
+                    "nago-city-hall": ["08:20", "09:50", "11:20", "12:50", "14:20", "15:50", "17:20", "18:50"]
+                },
+                "66": {
+                    "nago-terminal": ["06:30", "08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00"],
+                    "nago-city-hall": ["06:40", "08:10", "09:40", "11:10", "12:40", "14:10", "15:40", "17:10"],
+                    "warumi-bridge": ["06:50", "08:20", "09:50", "11:20", "12:50", "14:20", "15:50", "17:20"],
+                    "nakijin-office": ["07:00", "08:30", "10:00", "11:30", "13:00", "14:30", "16:00", "17:30"],
+                    "shoshi": ["07:10", "08:40", "10:10", "11:40", "13:10", "14:40", "16:10", "17:40"],
+                    "nakijin-castle": ["07:20", "08:50", "10:20", "11:50", "13:20", "14:50", "16:20", "17:50"],
+                    "bise": ["07:30", "09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00"],
+                    "churaumi-aquarium": ["07:40", "09:10", "10:40", "12:10", "13:40", "15:10", "16:40", "18:10"],
+                    "tokuchi": ["07:50", "09:20", "10:50", "12:20", "13:50", "15:20", "16:50", "18:20"],
+                    "sesoko-entrance": ["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30"],
+                    "motobu-port": ["08:10", "09:40", "11:10", "12:40", "14:10", "15:40", "17:10", "18:40"],
+                    "shio-gawa-beach": ["08:20", "09:50", "11:20", "12:50", "14:20", "15:50", "17:20", "18:50"]
+                }
+            },
+            sunday: {
+                "65": {
+                    "nago-terminal": ["07:00", "09:00", "11:00", "13:00", "15:00", "17:00"],
+                    "shio-gawa-beach": ["07:15", "09:15", "11:15", "13:15", "15:15", "17:15"],
+                    "motobu-port": ["07:30", "09:30", "11:30", "13:30", "15:30", "17:30"],
+                    "sesoko-entrance": ["07:45", "09:45", "11:45", "13:45", "15:45", "17:45"],
+                    "tokuchi": ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"],
+                    "churaumi-aquarium": ["08:15", "10:15", "12:15", "14:15", "16:15", "18:15"],
+                    "bise": ["08:30", "10:30", "12:30", "14:30", "16:30", "18:30"],
+                    "nakijin-castle": ["08:45", "10:45", "12:45", "14:45", "16:45", "18:45"],
+                    "shoshi": ["09:00", "11:00", "13:00", "15:00", "17:00", "19:00"],
+                    "nakijin-office": ["09:15", "11:15", "13:15", "15:15", "17:15", "19:15"],
+                    "warumi-bridge": ["09:30", "11:30", "13:30", "15:30", "17:30", "19:30"],
+                    "nago-city-hall": ["09:45", "11:45", "13:45", "15:45", "17:45", "19:45"]
+                },
+                "66": {
+                    "nago-terminal": ["07:00", "09:00", "11:00", "13:00", "15:00", "17:00"],
+                    "nago-city-hall": ["07:15", "09:15", "11:15", "13:15", "15:15", "17:15"],
+                    "warumi-bridge": ["07:30", "09:30", "11:30", "13:30", "15:30", "17:30"],
+                    "nakijin-office": ["07:45", "09:45", "11:45", "13:45", "15:45", "17:45"],
+                    "shoshi": ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00"],
+                    "nakijin-castle": ["08:15", "10:15", "12:15", "14:15", "16:15", "18:15"],
+                    "bise": ["08:30", "10:30", "12:30", "14:30", "16:30", "18:30"],
+                    "churaumi-aquarium": ["08:45", "10:45", "12:45", "14:45", "16:45", "18:45"],
+                    "tokuchi": ["09:00", "11:00", "13:00", "15:00", "17:00", "19:00"],
+                    "sesoko-entrance": ["09:15", "11:15", "13:15", "15:15", "17:15", "19:15"],
+                    "motobu-port": ["09:30", "11:30", "13:30", "15:30", "17:30", "19:30"],
+                    "shio-gawa-beach": ["09:45", "11:45", "13:45", "15:45", "17:45", "19:45"]
+                }
+            }
+        };
+
         // 移動時間データ
         const travelTimes = {
             weekday: {
-                "65": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120], // 時計回り
-                "66": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]  // 反時計回り
+                "65": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120],
+                "66": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
             },
             saturday: {
                 "65": [0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144],
@@ -527,7 +743,11 @@
             modalTitle.textContent = `${stop.name[currentLanguage]} - ${translations[currentLanguage].modalTitle}`;
             
             modalContent.innerHTML = `
+                <img src="${stop.image}" alt="${stop.name[currentLanguage]}" class="stop-image">
                 <p>${stop.description[currentLanguage]}</p>
+                <h3>${translations[currentLanguage].sightseeing}</h3>
+                <p>${stop.sightseeing[currentLanguage]}</p>
+                
                 <div style="margin-top: 20px;">
                     <h3>${translations[currentLanguage].route65}</h3>
                     <p>${translations[currentLanguage].nextStop}: ${busStops[nextIndex].name[currentLanguage]}</p>
@@ -540,9 +760,58 @@
                     <p>${translations[currentLanguage].travelTime}: ${Math.abs(time66)} ${translations[currentLanguage].minutes}</p>
                     <p><small>${translations[currentLanguage].fromNago}: ${travelTimes[currentDay]["66"][index]} ${translations[currentLanguage].minutes}</small></p>
                 </div>
+                
+                <div style="margin-top: 30px;">
+                    <button class="timetable-btn" onclick="showTimetable('65', '${stop.id}')">${translations[currentLanguage].showTimetable65}</button>
+                    <button class="timetable-btn" onclick="showTimetable('66', '${stop.id}')">${translations[currentLanguage].showTimetable66}</button>
+                </div>
+                
+                <div id="timetable-65" class="timetable"></div>
+                <div id="timetable-66" class="timetable"></div>
             `;
             
             modal.style.display = "flex";
+        }
+
+        // 時刻表を表示
+        function showTimetable(route, stopId) {
+            const timetableDiv = document.getElementById(`timetable-${route}`);
+            
+            // 既に表示されている場合は非表示にする
+            if (timetableDiv.classList.contains("active")) {
+                timetableDiv.classList.remove("active");
+                return;
+            }
+            
+            // 他の時刻表を非表示
+            document.querySelectorAll(".timetable").forEach(t => t.classList.remove("active"));
+            
+            // 時刻表データを取得
+            const timetableData = timetables[currentDay][route][stopId];
+            
+            // 日付ラベル
+            let dayLabel = "";
+            if (currentDay === "weekday") {
+                dayLabel = translations[currentLanguage].weekdayTimetable;
+            } else if (currentDay === "saturday") {
+                dayLabel = translations[currentLanguage].saturdayTimetable;
+            } else {
+                dayLabel = translations[currentLanguage].sundayTimetable;
+            }
+            
+            // 時刻表HTMLを生成
+            timetableDiv.innerHTML = `
+                <h4>${translations[currentLanguage].route${route}} - ${dayLabel}</h4>
+                <p>${translations[currentLanguage].departureTimes}:</p>
+                <table class="timetable-table">
+                    <tr>
+                        ${timetableData.map(time => `<td>${time}</td>`).join("")}
+                    </tr>
+                </table>
+            `;
+            
+            // 時刻表を表示
+            timetableDiv.classList.add("active");
         }
 
         // モーダルを閉じる
@@ -577,6 +846,9 @@
             
             contactLink.innerHTML = translations[currentLanguage].contact;
         }
+
+        // グローバル関数として登録
+        window.showTimetable = showTimetable;
 
         // アプリを起動
         document.addEventListener("DOMContentLoaded", initApp);
